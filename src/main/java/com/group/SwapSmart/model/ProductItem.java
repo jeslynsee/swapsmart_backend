@@ -20,7 +20,7 @@ public class ProductItem {
     private String productName;
 
     // Categories list from API
-    @JsonProperty("categories_tags_en")
+    @JsonProperty("categories_tags")
     private List<String> categoryTags;
 
     // Nutriments object from API
