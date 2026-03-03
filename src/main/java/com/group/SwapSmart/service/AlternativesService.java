@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -53,22 +56,17 @@ public class AlternativesService {
 
             // grabbing the whole list of category tags here
             List<String> tags = productItem.getCategoryTags();
+            System.out.println("Tags: " + tags); // for testing, need to delete
 
+            //IMPORTANT: here, if no categories can be found, we just return immutable list; need to change logic to handle this scenario
             // null check in case category tags is empty or doesn't exist for product scanned
             if (tags == null || tags.isEmpty()) {
                System.out.println("No categories info available");
                return List.of();
             }
 
-            // grab last category/most specific category 
-            
-            category = tags.stream()
-                .filter(t -> t != null && t.startsWith("en:"))
-                .reduce((first, last) -> last)     // take the last en: tag (most specific in that subset)
-                .orElse(tags.get(tags.size() - 1)); // fallback if no en: tags exist
-
             // Grab most specific category tag from the API response (last item in list)
-            // category = productItem.getCategoryTags().get(productItem.getCategoryTags().size() - 1);
+            category = tags.get(tags.size() - 1);
 
             // Save product to DB for future lookups
             saveProduct(productItem);
@@ -82,7 +80,7 @@ public class AlternativesService {
     private ProductItem fetchProductByBarcode(String barcode) { 
         try {
             ProductResponse response = restClient.get()
-            .uri(BASE_URL + "/product/" + barcode + "?fields=product_name,code,categories_tags,nutriments")
+            .uri(BASE_URL + "/product/" + barcode + "?fields=product_name,code,categories_tags_en,nutriments")
             .retrieve()
             .body(ProductResponse.class);
 
@@ -103,12 +101,14 @@ public class AlternativesService {
     private List<Product> fetchAlternatives(String category) {  
         // Call search API with No Sugar label and category filters combined
         try {
+            // URL encode category to handle spaces and special characters
+            String encodedCategory = URLEncoder.encode(category, StandardCharsets.UTF_8);
             SearchResponse response = restClient.get()
-                .uri(BASE_URL + "/search?categories_tags=" + category +
+                .uri(BASE_URL + "/search?categories_tags_en=" + encodedCategory +
                 "&labels_tags=en:no-sugar" +
-                "&sugars_100g<=" + SUGAR_THRESHOLD +
+                "&nutriments_sugars_100g_max=" + SUGAR_THRESHOLD +
                 "&countries_tags=en:united-states" +
-                "&fields=product_name,code,categories_tags,nutriments" +
+                "&fields=product_name,code,categories_tags_en,nutriments" +
                 "&page_size=10")
                 .retrieve()
                 .body(SearchResponse.class);
@@ -161,7 +161,7 @@ public class AlternativesService {
             product.setCategory(chosen);
         }
 
-        // Use effective sugars (added_sugars_100g if available, otherwise sugars_100g)
+        // Use effective sugars (added-sugars_100g if available, otherwise sugars_100g)
         if (item.getNutriments() != null) {
             product.setSugars100g(item.getNutriments().getEffectiveSugars());
         }
@@ -170,6 +170,5 @@ public class AlternativesService {
         product.setLastChecked(LocalDateTime.now());
         return product;
     }
-
-//TODO: check why not returning simple sugar free alt such as coke zero for a coke scan
+    //TODO: Look into FatSecret API, as OpenFoodFacts keeps producing unreliability issues
 }
