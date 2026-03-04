@@ -39,7 +39,7 @@ public class ProductItem {
         @JsonProperty("sugars_100g")
         private Double sugars100g;
 
-        // Returns added_sugars_100g if available, otherwise falls back to sugars_100g
+        // Returns added-sugars_100g if available, otherwise falls back to sugars_100g
         public Double getEffectiveSugars() {
             return addedSugars100g != null ? addedSugars100g : sugars100g;
         }
