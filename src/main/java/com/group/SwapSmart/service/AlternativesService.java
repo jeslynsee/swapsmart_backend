@@ -48,6 +48,7 @@ public class AlternativesService {
         if (cachedProduct.isPresent()) {
             // Product already cached, grab category from DB instead of calling API
             category = cachedProduct.get().getCategory();
+            alternatives = fetchAlternatives(category);
         } else {
             // Product not cached, call API to get product info
             ProductItem productItem = fetchProductByBarcode(barcode);
@@ -68,6 +69,8 @@ public class AlternativesService {
                return List.of();
             }
 
+            // Step 2: Search for sugar free alternatives in the same category
+
             // Grab most specific category tag from the API response (last item in list)
            category = tags.get(tags.size() - 1);
 
@@ -80,15 +83,15 @@ public class AlternativesService {
            if (alternatives.isEmpty() && tags.size() > 1) { // if we get empty list (AKA no alts), and there is >1 category, check second to last category
             category = tags.get(tags.size() - 2); 
            } else {
-            System.out.println("Exhausted category hierarchy up to 2 most specific");
+            System.out.println("Exhausted category hierarchy (only had 1 category tag)");
            }
 
             // Save product to DB for future lookups
             saveProduct(productItem, category);
         }
 
-        // Step 2: Search for sugar free alternatives in the same category
-        return fetchAlternatives(category);
+        // whether we grab alternatives by finding product from db, or exhausting category hierarchy, we return what we fetch here
+        return alternatives;
     }
 
    // Calls OpenFoodFacts API to get product info by barcode
@@ -106,7 +109,7 @@ public class AlternativesService {
             }
 
         } catch (RestClientException e) {
-            System.out.println("Error with calling API to get product data by barcode");
+            System.out.println("Error with calling API to get product data by barcode " + e.getMessage());
             return null;
         }
         
