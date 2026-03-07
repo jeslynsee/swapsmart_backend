@@ -46,10 +46,16 @@ public class AlternativesService {
         List<Product> alternatives;
         ProductItem productItem;
         List<String> tags;
+        double sugarThreshold;
 
         if (cachedProduct.isPresent()) {
             // Product already cached, grab category from DB instead of calling API
             category = cachedProduct.get().getCategory();
+            // grabbing sugar from db, but if null, set threshold to defined one in class
+            sugarThreshold = cachedProduct.get().getSugars100g() != null 
+            ? cachedProduct.get().getSugars100g() 
+            : SUGAR_THRESHOLD;
+
             // alternatives = fetchAlternativesWithLabel(category);
         } else {
             // Product not cached, call API to get product info
@@ -62,6 +68,7 @@ public class AlternativesService {
 
             // grabbing the whole list of category tags here
             tags = productItem.getCategoryTags();
+            // System.out.println("Category tags from OFF: " + tags);
 
             //if no categories can be found, we just return immutable list; need to change logic to handle this scenario
             // maybe look into other related tags
@@ -75,6 +82,10 @@ public class AlternativesService {
 
             // Grab most specific category tag from the API response (last item in list)
             category = tags.get(tags.size() - 1);
+            // grab sugar_100g from product item and set as sugar threshold, or fallback to defined sugar threshold if null
+            sugarThreshold = productItem.getNutriments() != null && productItem.getNutriments().getSugars100g() != null 
+            ? productItem.getNutriments().getSugars100g() 
+            : SUGAR_THRESHOLD; 
 
             // Trying for category hierarchy to get more results below
     
@@ -87,7 +98,7 @@ public class AlternativesService {
             } 
 
             if (alternatives.isEmpty()) {
-                alternatives = fetchAlternativesBySugar(category);
+                alternatives = fetchAlternativesBySugar(category, sugarThreshold);
             }
 
             // Save product to DB for future lookups
@@ -103,7 +114,7 @@ public class AlternativesService {
         alternatives = fetchAlternativesWithLabel(category);
 
         if (alternatives.isEmpty()) {
-            alternatives = fetchAlternativesBySugar(category);
+            alternatives = fetchAlternativesBySugar(category, sugarThreshold);
         }
        
         // returning alts from cached product
@@ -177,13 +188,13 @@ public class AlternativesService {
         }
     }
 
-    private  List<Product> fetchAlternativesBySugar(String category) {
+    private  List<Product> fetchAlternativesBySugar(String category, double sugarThreshold) {
         try {
             String encodedCategory = URLEncoder.encode(category, StandardCharsets.UTF_8).replace("+", "%20");
 
             String url = BASE_URL + "/search" +
             "?categories_tags_en=" + encodedCategory +
-            "&nutriments_sugars_100g_max=" + SUGAR_THRESHOLD +
+            "&nutriments_sugars_100g_max=" + sugarThreshold +
             "&countries_tags=en:united-states" +
             "&fields=product_name,code,categories_tags_en,nutriments" +
             "&page_size=10";
@@ -199,9 +210,9 @@ public class AlternativesService {
 
             return response.getProducts().stream()
                     .filter(item -> item.getNutriments() != null &&
-                        item.getNutriments().getEffectiveSugars() != null &&
-                        item.getNutriments().getEffectiveSugars() <= SUGAR_THRESHOLD)
-                    .sorted(Comparator.comparingDouble(item -> item.getNutriments().getEffectiveSugars()))
+                        item.getNutriments().getSugars100g() != null &&
+                        item.getNutriments().getSugars100g() < sugarThreshold)
+                    .sorted(Comparator.comparingDouble(item -> item.getNutriments().getSugars100g()))
                     .limit(3)
                     .map(this::mapToProduct)
                     .toList();
