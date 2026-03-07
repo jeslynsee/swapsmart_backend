@@ -44,14 +44,16 @@ public class AlternativesService {
 
         String category;
         List<Product> alternatives;
+        ProductItem productItem;
+        List<String> tags;
 
         if (cachedProduct.isPresent()) {
             // Product already cached, grab category from DB instead of calling API
             category = cachedProduct.get().getCategory();
-            alternatives = fetchAlternatives(category);
+            // alternatives = fetchAlternativesWithLabel(category);
         } else {
             // Product not cached, call API to get product info
-            ProductItem productItem = fetchProductByBarcode(barcode);
+            productItem = fetchProductByBarcode(barcode);
 
             if (productItem == null) { // if we got null from fetchProductByBarcode, then handled here by returning immutable list
                 System.out.println("Could not grab item info from API, so cannot get alternatives");
@@ -59,9 +61,9 @@ public class AlternativesService {
             }
 
             // grabbing the whole list of category tags here
-            List<String> tags = productItem.getCategoryTags();
+            tags = productItem.getCategoryTags();
 
-            //IMPORTANT: here, if no categories can be found, we just return immutable list; need to change logic to handle this scenario
+            //if no categories can be found, we just return immutable list; need to change logic to handle this scenario
             // maybe look into other related tags
             // null check in case category tags is empty or doesn't exist for product scanned
             if (tags == null || tags.isEmpty()) {
@@ -72,25 +74,39 @@ public class AlternativesService {
             // Step 2: Search for sugar free alternatives in the same category
 
             // Grab most specific category tag from the API response (last item in list)
-           category = tags.get(tags.size() - 1);
+            category = tags.get(tags.size() - 1);
 
-           /*
-           Trying for category hierarchy to get more results below
-            */
-           // searching for alternatives first with most specific/last category
-           alternatives = fetchAlternatives(category);
+            // Trying for category hierarchy to get more results below
+    
+            // searching for alternatives first with most specific/last category
+            alternatives = fetchAlternativesWithLabel(category);
 
-           if (alternatives.isEmpty() && tags.size() > 1) { // if we get empty list (AKA no alts), and there is >1 category, check second to last category
-            category = tags.get(tags.size() - 2); 
-           } else {
-            System.out.println("Exhausted category hierarchy (only had 1 category tag)");
-           }
+            if (alternatives.isEmpty() && tags.size() > 1) { // if we get empty list (AKA no alts), and there is >1 category, check second to last category
+                category = tags.get(tags.size() - 2); 
+                alternatives = fetchAlternativesWithLabel(category);
+            } 
+
+            if (alternatives.isEmpty()) {
+                alternatives = fetchAlternativesBySugar(category);
+            }
 
             // Save product to DB for future lookups
             saveProduct(productItem, category);
+
+            // returning alts found from first time barcode scan
+            return alternatives;
         }
 
-        // whether we grab alternatives by finding product from db, or exhausting category hierarchy, we return what we fetch here
+         // this is if we grab category from db cache, so we don't need to do any category work. just grab cached category
+        // and try with no added sugar label. if no results, try by sugar
+
+        alternatives = fetchAlternativesWithLabel(category);
+
+        if (alternatives.isEmpty()) {
+            alternatives = fetchAlternativesBySugar(category);
+        }
+       
+        // returning alts from cached product
         return alternatives;
     }
 
@@ -116,14 +132,12 @@ public class AlternativesService {
     }
 
     // Searches OpenFoodFacts for sugar free alternatives in the given category AND with the No Added Sugar label
-    private List<Product> fetchAlternatives(String category) {
+    private List<Product> fetchAlternativesWithLabel(String category) {
         try {
             // URL encode category to handle spaces and special characters; also replacing the + in HTML style encoding to %20 
             String encodedCategory = URLEncoder.encode(category, StandardCharsets.UTF_8).replace("+", "%20");
     
             // Build URL with encoded special characters to prevent URL parsing issues
-            // Colons in query param values must be encoded as %3A
-            // Commas in fields list must be encoded as %2C
             String url = BASE_URL + "/search" +
                 "?categories_tags_en=" + encodedCategory +
                 "&labels_tags=en:no-added-sugars" +
@@ -161,6 +175,42 @@ public class AlternativesService {
             System.out.println("RestClient error: " + e.getMessage());
             return List.of();
         }
+    }
+
+    private  List<Product> fetchAlternativesBySugar(String category) {
+        try {
+            String encodedCategory = URLEncoder.encode(category, StandardCharsets.UTF_8).replace("+", "%20");
+
+            String url = BASE_URL + "/search" +
+            "?categories_tags_en=" + encodedCategory +
+            "&nutriments_sugars_100g_max=" + SUGAR_THRESHOLD +
+            "&countries_tags=en:united-states" +
+            "&fields=product_name,code,categories_tags_en,nutriments" +
+            "&page_size=10";
+
+            SearchResponse response = restClient.get()
+                    .uri(URI.create(url))
+                    .retrieve()
+                    .body(SearchResponse.class);
+
+            if (response == null || response.getProducts() == null) {
+                return List.of();
+            }
+
+            return response.getProducts().stream()
+                    .filter(item -> item.getNutriments() != null &&
+                        item.getNutriments().getEffectiveSugars() != null &&
+                        item.getNutriments().getEffectiveSugars() <= SUGAR_THRESHOLD)
+                    .sorted(Comparator.comparingDouble(item -> item.getNutriments().getEffectiveSugars()))
+                    .limit(3)
+                    .map(this::mapToProduct)
+                    .toList();
+
+        } catch (RestClientException e) {
+            System.out.println("Error fetching data with API Call for fetchAlternativesBySugar: " + e.getMessage());
+            return List.of();
+        }
+        
     }
 
         // Saves a new product to the DB
