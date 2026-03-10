@@ -125,15 +125,18 @@ public class AlternativesService {
     private ProductItem fetchProductByBarcode(String barcode) { 
         try {
             ProductResponse response = restClient.get()
-            .uri(BASE_URL + "/product/" + barcode + "?fields=product_name,code,categories_tags_en,nutriments")
+            .uri(BASE_URL + "/product/" + barcode + "?fields=product_name,code,categories_tags_en,nutriments,allergens_tags")
             .retrieve()
             .body(ProductResponse.class);
+
+            System.out.println("Calling API for barcode: " + barcode);
 
             if (response != null) { // null check here because RestClientException doesn't include null 
                 return response.getProduct();
             } else {
                 return null;
             }
+
 
         } catch (RestClientException e) {
             System.out.println("Error with calling API to get product data by barcode " + e.getMessage());
@@ -241,6 +244,11 @@ public class AlternativesService {
         // Use effective sugars (added-sugars_100g if available, otherwise sugars_100g)
         if (item.getNutriments() != null) {
             product.setSugars100g(item.getNutriments().getEffectiveSugars());
+        }
+
+         // Save allergens as comma separated string
+        if (item.getAllergensTags() != null && !item.getAllergensTags().isEmpty()) {
+            product.setAllergens(String.join(",", item.getAllergensTags()));
         }
 
         product.setCountry("united-states");

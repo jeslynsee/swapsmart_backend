@@ -36,6 +36,19 @@ public class Product {
     @Column
     private LocalDateTime lastChecked;
 
+    // Allergens contained in this product e.g. "en:gluten,en:milk"
+    @Column(length = 1000)
+    private String allergens;
+
+    // Getter and Setter
+    public String getAllergens() { 
+        return allergens; 
+    }
+
+    public void setAllergens(String allergens) { 
+        this.allergens = allergens; 
+    }
+
     // Getters and Setters
     public Long getProductId() { 
         return productId; 

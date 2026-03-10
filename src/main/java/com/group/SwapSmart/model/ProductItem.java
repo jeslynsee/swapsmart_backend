@@ -23,6 +23,14 @@ public class ProductItem {
     @JsonProperty("categories_tags_en")
     private List<String> categoryTags;
 
+    // Allergens list from API
+    @JsonProperty("allergens_tags")
+    private List<String> allergensTags;
+
+    // Getter and Setter
+    public List<String> getAllergensTags() { return allergensTags; }
+    public void setAllergensTags(List<String> allergensTags) { this.allergensTags = allergensTags; }
+
     // Nutriments object from API
     @JsonProperty("nutriments")
     private Nutriments nutriments;
