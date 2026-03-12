@@ -129,8 +129,6 @@ public class AlternativesService {
             .retrieve()
             .body(ProductResponse.class);
 
-            System.out.println("Calling API for barcode: " + barcode);
-
             if (response != null) { // null check here because RestClientException doesn't include null 
                 return response.getProduct();
             } else {
