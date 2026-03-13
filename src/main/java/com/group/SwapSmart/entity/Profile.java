@@ -3,46 +3,49 @@ package com.group.SwapSmart.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "users")  
-public class User {
+@Table(name = "profiles")
+public class Profile {
 
+    /* Represents our profiles table, where we will store user info such as id, first name,
+       last name, and username. This will help us later when we need to display reviews with 
+       different users' names, even if we are doing user auth through Supabase Auth.
+     */
+
+    // Primary key — matches Supabase auth.users UUID
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
+    // First name
     @Column(name = "first_name", nullable = false)
     private String firstName;
 
+    // Last name
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
-    @Column(nullable = false, unique = true)
-    private String email;
-
+    // Username
     @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
-
     // Constructors
-
-    public User() {
+    public Profile() {
     }
 
-    public User(String firstName, String lastName, String email,
-                String username, String passwordHash) {
+    public Profile(String id, String firstName, String lastName, String username) {
+        this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
-        this.email = email;
         this.username = username;
-        this.passwordHash = passwordHash;
     }
 
-    // Basic getters and setters below
+    // Getters and Setters
 
-    public Long getId() {
+    public String getId() {
         return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getFirstName() {
@@ -61,27 +64,11 @@ public class User {
         this.lastName = lastName;
     }
 
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
     public String getUsername() {
         return username;
     }
 
     public void setUsername(String username) {
         this.username = username;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
     }
 }
