@@ -12,10 +12,9 @@ public class SavedSwap {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Foreign key to users table
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // Refrencing Supabase Auth User table
+    @Column(name = "user_id", nullable = false)
+    private String userId;
 
     // Foreign key to products table (original scanned product)
     @ManyToOne
@@ -39,8 +38,8 @@ public class SavedSwap {
     public SavedSwap() {
     }
 
-    public SavedSwap(User user, Product originalProduct, Product alternativeProduct, Double sugarDifference) {
-        this.user = user;
+    public SavedSwap(String userId, Product originalProduct, Product alternativeProduct, Double sugarDifference) {
+        this.userId = userId;
         this.originalProduct = originalProduct;
         this.alternativeProduct = alternativeProduct;
         this.sugarDifference = sugarDifference;
@@ -53,12 +52,12 @@ public class SavedSwap {
         return id;
     }
 
-    public User getUser() {
-        return user;
+    public String getUserId() {
+        return userId;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public Product getOriginalProduct() {

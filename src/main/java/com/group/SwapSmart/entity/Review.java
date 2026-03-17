@@ -12,10 +12,9 @@ public class Review {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Foreign key to users table
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // Foreign key to Supabase Auth User table
+    @Column(name = "user_id", nullable = false)
+    private String userId;
 
     // Foreign key to saved_swaps table
     @ManyToOne
@@ -38,8 +37,8 @@ public class Review {
     public Review() {
     }
 
-    public Review(User user, SavedSwap savedSwap, Integer rating, String comment) {
-        this.user = user;
+    public Review(String userId, SavedSwap savedSwap, Integer rating, String comment) {
+        this.userId = userId;
         this.savedSwap = savedSwap;
         this.rating = rating;
         this.comment = comment;
@@ -52,12 +51,12 @@ public class Review {
         return id;
     }
 
-    public User getUser() {
-        return user;
+    public String getUserId() {
+        return userId;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public SavedSwap getSavedSwap() {

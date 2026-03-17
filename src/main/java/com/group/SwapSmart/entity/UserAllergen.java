@@ -11,10 +11,9 @@ public class UserAllergen {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Foreign key to users table
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // Supabase auth user UUID
+    @Column(name = "user_id", nullable = false)
+    private String userId;
 
     // Foreign key to allergens table
     @ManyToOne
@@ -25,8 +24,8 @@ public class UserAllergen {
     public UserAllergen() {
     }
 
-    public UserAllergen(User user, Allergen allergen) {
-        this.user = user;
+    public UserAllergen(String userId, Allergen allergen) {
+        this.userId = userId;
         this.allergen = allergen;
     }
 
@@ -36,12 +35,12 @@ public class UserAllergen {
         return id;
     }
 
-    public User getUser() {
-        return user;
+    public String getUserId() {
+        return userId;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public Allergen getAllergen() {
