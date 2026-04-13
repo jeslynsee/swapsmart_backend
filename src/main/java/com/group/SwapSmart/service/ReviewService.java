@@ -1,6 +1,9 @@
 package com.group.SwapSmart.service;
 
+import com.group.SwapSmart.dto.ReviewDTO;
+import com.group.SwapSmart.entity.Profile;
 import com.group.SwapSmart.entity.Review;
+import com.group.SwapSmart.repository.ProfileRepository;
 import com.group.SwapSmart.repository.ReviewRepository;
 import org.springframework.stereotype.Service;
 
@@ -11,10 +14,13 @@ import java.util.List;
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final ProfileRepository profileRepository;
 
     // Constructor injection
-    public ReviewService(ReviewRepository reviewRepository) {
+    public ReviewService(ReviewRepository reviewRepository,
+                         ProfileRepository profileRepository) {
         this.reviewRepository = reviewRepository;
+        this.profileRepository = profileRepository;
     }
 
     // Creates a review for a product
@@ -37,18 +43,50 @@ public class ReviewService {
         return reviewRepository.save(review);
     }
 
-    // Gets all reviews for a specific product
-    public List<Review> getReviewsByBarcode(String barcode) {
-        return reviewRepository.findByBarcode(barcode);
+    // Gets all reviews for a specific product with username
+    public List<ReviewDTO> getReviewsByBarcode(String barcode) {
+        return reviewRepository.findByBarcode(barcode)
+                .stream()
+                .map(this::mapToDTO)
+                .toList();
     }
 
     // Gets all reviews across all products (community page)
-    public List<Review> getAllReviews() {
-        return reviewRepository.findAll();
+    public List<ReviewDTO> getAllReviews() {
+        return reviewRepository.findAll()
+                .stream()
+                .map(this::mapToDTO)
+                .toList();
     }
 
     // Gets all reviews by the authenticated user
-    public List<Review> getMyReviews(String userId) {
-        return reviewRepository.findByUserId(userId);
+    public List<ReviewDTO> getMyReviews(String userId) {
+        return reviewRepository.findByUserId(userId)
+                .stream()
+                .map(this::mapToDTO)
+                .toList();
+    }
+
+    // Maps a Review entity to a ReviewDTO with username from profiles table
+    private ReviewDTO mapToDTO(Review review) {
+        String username = "Anonymous";
+        String displayName = "Anonymous";
+    
+        var profileOpt = profileRepository.findById(review.getUserId());
+        if (profileOpt.isPresent()) {
+            Profile profile = profileOpt.get();
+            username = profile.getUsername();
+            displayName = profile.getFirstName() + " " + profile.getLastName().charAt(0) + ".";
+        }
+    
+        return new ReviewDTO(
+                review.getId(),
+                displayName,
+                username,
+                review.getBarcode(),
+                review.getRating(),
+                review.getComment(),
+                review.getTimeCreated()
+        );
     }
 }

@@ -1,5 +1,6 @@
 package com.group.SwapSmart.controller;
 
+import com.group.SwapSmart.dto.ReviewDTO;
 import com.group.SwapSmart.entity.Review;
 import com.group.SwapSmart.service.ReviewService;
 import org.springframework.http.ResponseEntity;
@@ -46,25 +47,26 @@ public class ReviewController {
     // GET /api/reviews/{barcode}
     // Gets all reviews for a specific product
     @GetMapping("/{barcode}")
-    public ResponseEntity<List<Review>> getReviewsByBarcode(@PathVariable String barcode) {
-        List<Review> reviews = reviewService.getReviewsByBarcode(barcode);
+    public ResponseEntity<List<ReviewDTO>> getReviewsByBarcode(@PathVariable String barcode) {
+        List<ReviewDTO> reviews = reviewService.getReviewsByBarcode(barcode);
         return ResponseEntity.ok(reviews);
     }
+
 
     // GET /api/reviews
     // Gets all reviews across all products (community page)
     @GetMapping
-    public ResponseEntity<List<Review>> getAllReviews() {
-        List<Review> reviews = reviewService.getAllReviews();
+    public ResponseEntity<List<ReviewDTO>> getAllReviews() {
+        List<ReviewDTO> reviews = reviewService.getAllReviews();
         return ResponseEntity.ok(reviews);
     }
 
     // GET /api/reviews/mine
     // Gets all reviews by the authenticated user
     @GetMapping("/mine")
-    public ResponseEntity<List<Review>> getMyReviews(Authentication authentication) {
+    public ResponseEntity<List<ReviewDTO>> getMyReviews(Authentication authentication) {
         String userId = authentication.getPrincipal().toString();
-        List<Review> reviews = reviewService.getMyReviews(userId);
+        List<ReviewDTO> reviews = reviewService.getMyReviews(userId);
         return ResponseEntity.ok(reviews);
     }
 }
