@@ -3,6 +3,7 @@ package com.group.SwapSmart.config;
 import com.group.SwapSmart.filter.JWTAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -28,6 +29,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints — no auth needed
                 .requestMatchers("/api/alts/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 // Everything else requires valid JWT
                 .anyRequest().authenticated()
             )

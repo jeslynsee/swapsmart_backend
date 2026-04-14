@@ -16,10 +16,9 @@ public class Review {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
-    // Foreign key to saved_swaps table
-    @ManyToOne
-    @JoinColumn(name = "saved_swap_id", nullable = false)
-    private SavedSwap savedSwap;
+    // Barcode of product user is reviewing (no longer constraining to a saved swap)
+    @Column(nullable = false)
+    private String barcode;
 
     // Rating (e.g. 1-5)
     @Column(nullable = false)
@@ -37,9 +36,9 @@ public class Review {
     public Review() {
     }
 
-    public Review(String userId, SavedSwap savedSwap, Integer rating, String comment) {
+    public Review(String userId, String barcode, Integer rating, String comment) {
         this.userId = userId;
-        this.savedSwap = savedSwap;
+        this.barcode = barcode;
         this.rating = rating;
         this.comment = comment;
         this.timeCreated = LocalDateTime.now();
@@ -59,12 +58,12 @@ public class Review {
         this.userId = userId;
     }
 
-    public SavedSwap getSavedSwap() {
-        return savedSwap;
+    public String getBarcode() {
+        return barcode;
     }
 
-    public void setSavedSwap(SavedSwap savedSwap) {
-        this.savedSwap = savedSwap;
+    public void setBarcode(String barcode) {
+        this.barcode = barcode;
     }
 
     public Integer getRating() {
