@@ -2,7 +2,6 @@ package com.group.SwapSmart.service;
 
 import com.group.SwapSmart.entity.Product;
 import com.group.SwapSmart.model.ProductItem;
-import com.group.SwapSmart.model.ProductResponse;
 import com.group.SwapSmart.model.SearchResponse;
 import com.group.SwapSmart.repository.ProductRepository;
 import com.group.SwapSmart.repository.UserAllergenRepository;
@@ -14,7 +13,6 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -26,6 +24,7 @@ public class AlternativesService {
     private final ProductRepository productsRepository;
     private final UserAllergenRepository userAllergenRepository;
     private final RestClient restClient;
+    private final ProductService productService;
 
     // Base URL for OpenFoodFacts API
     private static final String BASE_URL = "https://world.openfoodfacts.org/api/v2";
@@ -34,10 +33,11 @@ public class AlternativesService {
     private static final double SUGAR_THRESHOLD = 5;
 
     // Constructor injection
-    public AlternativesService(ProductRepository productsRepository, UserAllergenRepository userAllergenRepository) {
+    public AlternativesService(ProductRepository productsRepository, UserAllergenRepository userAllergenRepository, ProductService productService) {
         this.productsRepository = productsRepository;
         this.userAllergenRepository = userAllergenRepository;
         this.restClient = RestClient.create();
+        this.productService = productService;
     }
 
     // Main method: takes a barcode and returns a list of sugar free alternatives
@@ -66,13 +66,17 @@ public class AlternativesService {
             // Product already cached, grab category from DB instead of calling API
             category = cachedProduct.get().getCategory();
             // grabbing sugar from db, but if null, set threshold to defined one in class
-            sugarThreshold = cachedProduct.get().getSugars100g() != null 
-            ? cachedProduct.get().getSugars100g() 
+            sugarThreshold = cachedProduct.get().getSugars100g() != null
+            ? cachedProduct.get().getSugars100g()
             : SUGAR_THRESHOLD;
+
+            if (category == null || category.isBlank()) {
+                return List.of();
+            }
 
         } else {
             // Product not cached, call API to get product info
-            productItem = fetchProductByBarcode(barcode);
+            productItem = productService.fetchProductByBarcode(barcode);
 
             if (productItem == null) { // if we got null from fetchProductByBarcode, then handled here by returning immutable list
                 System.out.println("Could not grab item info from API, so cannot get alternatives");
@@ -96,26 +100,26 @@ public class AlternativesService {
             // Grab most specific category tag from the API response (last item in list)
             category = tags.get(tags.size() - 1);
             // grab sugar_100g from product item and set as sugar threshold, or fallback to defined sugar threshold if null
-            sugarThreshold = productItem.getNutriments() != null && productItem.getNutriments().getSugars100g() != null 
-            ? productItem.getNutriments().getSugars100g() 
-            : SUGAR_THRESHOLD; 
+            sugarThreshold = productItem.getNutriments() != null && productItem.getNutriments().getEffectiveSugars() != null
+            ? productItem.getNutriments().getEffectiveSugars()
+            : SUGAR_THRESHOLD;
 
             // Trying for category hierarchy to get more results below
-    
+
             // searching for alternatives first with most specific/last category
             alternatives = fetchAlternativesWithLabel(category, userAllergens);
 
             if (alternatives.isEmpty() && tags.size() > 1) { // if we get empty list (AKA no alts), and there is >1 category, check second to last category
-                category = tags.get(tags.size() - 2); 
+                category = tags.get(tags.size() - 2);
                 alternatives = fetchAlternativesWithLabel(category, userAllergens);
-            } 
+            }
 
             if (alternatives.isEmpty()) {
                 alternatives = fetchAlternativesBySugar(category, sugarThreshold, userAllergens);
             }
 
             // Save product to DB for future lookups
-            saveProduct(productItem, category);
+            productService.saveProduct(productItem, category);
 
             // returning alts found from first time barcode scan
             return alternatives;
@@ -129,45 +133,23 @@ public class AlternativesService {
         if (alternatives.isEmpty()) {
             alternatives = fetchAlternativesBySugar(category, sugarThreshold, userAllergens);
         }
-       
+
         // returning alts from cached product
         return alternatives;
-    }
-
-   // Calls OpenFoodFacts API to get product info by barcode
-    private ProductItem fetchProductByBarcode(String barcode) { 
-        try {
-            ProductResponse response = restClient.get()
-            .uri(BASE_URL + "/product/" + barcode + "?fields=product_name,code,categories_tags_en,nutriments,allergens_tags")
-            .retrieve()
-            .body(ProductResponse.class);
-
-            if (response != null) { // null check here because RestClientException doesn't include null 
-                return response.getProduct();
-            } else {
-                return null;
-            }
-
-
-        } catch (RestClientException e) {
-            System.out.println("Error with calling API to get product data by barcode " + e.getMessage());
-            return null;
-        }
-        
     }
 
     // Searches OpenFoodFacts for sugar free alternatives in the given category AND with the No Added Sugar label
     private List<Product> fetchAlternativesWithLabel(String category, List<String> userAllergens) {
         try {
-            // URL encode category to handle spaces and special characters; also replacing the + in HTML style encoding to %20 
+            // URL encode category to handle spaces and special characters; also replacing the + in HTML style encoding to %20
             String encodedCategory = URLEncoder.encode(category, StandardCharsets.UTF_8).replace("+", "%20");
-    
+
             // Build URL with encoded special characters to prevent URL parsing issues
             String url = BASE_URL + "/search" +
                 "?categories_tags_en=" + encodedCategory +
                 "&labels_tags=en:no-added-sugars" +
                 "&nutriments_sugars_100g_max=" + SUGAR_THRESHOLD +
-                "&countries_tags=en:united-states" +    
+                "&countries_tags=en:united-states" +
                 "&fields=product_name,code,categories_tags_en,nutriments,allergens_tags" +
                 "&page_size=10";
 
@@ -177,13 +159,13 @@ public class AlternativesService {
                     .uri(URI.create(url))
                     .retrieve()
                     .body(SearchResponse.class);
-    
+
             // Null check here because RestClientException doesn't include null
             // Checks if response is null or if product list within response is null
             if (response == null || response.getProducts() == null) {
                 return List.of();
             }
-    
+
             // Secondary Java filter to catch any products that slipped through the API filter
             // then map to Product entity and return top 3
             return response.getProducts().stream()
@@ -193,9 +175,9 @@ public class AlternativesService {
                     .filter(item -> !containsUserAllergens(item, userAllergens))
                     .sorted(Comparator.comparingDouble(item -> item.getNutriments().getEffectiveSugars()))
                     .limit(3)
-                    .map(this::mapToProduct)
+                    .map(item -> productService.mapToProduct(item, null))
                     .toList();
-    
+
         } catch (RestClientException e) {
             // Log actual error message for debugging
             System.out.println("RestClient error: " + e.getMessage());
@@ -226,19 +208,19 @@ public class AlternativesService {
 
             return response.getProducts().stream()
                     .filter(item -> item.getNutriments() != null &&
-                        item.getNutriments().getSugars100g() != null &&
-                        item.getNutriments().getSugars100g() < sugarThreshold)
+                        item.getNutriments().getEffectiveSugars() != null &&
+                        item.getNutriments().getEffectiveSugars() < sugarThreshold)
                     .filter(item -> !containsUserAllergens(item, userAllergens))
-                    .sorted(Comparator.comparingDouble(item -> item.getNutriments().getSugars100g()))
+                    .sorted(Comparator.comparingDouble(item -> item.getNutriments().getEffectiveSugars()))
                     .limit(3)
-                    .map(this::mapToProduct)
+                    .map(item -> productService.mapToProduct(item, null))
                     .toList();
 
         } catch (RestClientException e) {
             System.out.println("Error fetching data with API Call for fetchAlternativesBySugar: " + e.getMessage());
             return List.of();
         }
-        
+
     }
 
     // Checks if a product contains any of the user's allergens
@@ -251,38 +233,5 @@ public class AlternativesService {
                 .anyMatch(allergen -> item.getAllergensTags().contains("en:" + allergen));
     }
 
-        // Saves a new product to the DB
-    private void saveProduct(ProductItem productItem, String category) {
-        Product product = mapToProduct(productItem, category);
-        product.setLastChecked(LocalDateTime.now());
-        productsRepository.save(product);
-    }
 
-    // Maps a ProductItem (API response) to a Products entity (DB)
-    private Product mapToProduct(ProductItem item, String category) {
-        Product product = new Product();
-        product.setBarcode(item.getBarcode());
-        product.setProductName(item.getProductName());
-        product.setCategory(category);
-
-        // Use effective sugars (added-sugars_100g if available, otherwise sugars_100g)
-        if (item.getNutriments() != null) {
-            product.setSugars100g(item.getNutriments().getEffectiveSugars());
-        }
-
-         // Save allergens as comma separated string
-        if (item.getAllergensTags() != null && !item.getAllergensTags().isEmpty()) {
-            product.setAllergens(String.join(",", item.getAllergensTags()));
-        }
-
-        product.setCountry("united-states");
-        product.setLastChecked(LocalDateTime.now());
-        return product;
-    }
-
-    // Used for mapping alternatives returned from search (not saved to DB)
-    private Product mapToProduct(ProductItem item) {
-        return mapToProduct(item, null);
-    }
-   
 }
