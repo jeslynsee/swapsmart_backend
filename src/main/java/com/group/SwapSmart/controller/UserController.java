@@ -2,10 +2,14 @@ package com.group.SwapSmart.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.group.SwapSmart.entity.Profile;
+import com.group.SwapSmart.entity.SavedSwap;
 import com.group.SwapSmart.entity.UserAllergen;
 import com.group.SwapSmart.repository.ProfileRepository;
 import com.group.SwapSmart.service.UserAllergenService;
@@ -51,6 +55,14 @@ public class UserController {
     public List<UserAllergen> getUserAllergens(Authentication authentication) {
         String userId = authentication.getPrincipal().toString();
         return userAllergenService.getUserAllergens(userId);
+    }
+
+   @GetMapping("/profile")
+    public Profile getCurrentUserProfile(Authentication authentication) {
+        String userId = authentication.getPrincipal().toString();
+        return profileRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Profile not found"));
     }
 
 }
